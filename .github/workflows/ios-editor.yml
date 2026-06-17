@@ -1,14 +1,18 @@
 name: 🛠️ Build Godot iPadOS Editor
 
 on:
-  workflow_dispatch: # Pozwala na ręczne uruchomienie przyciskiem
+  workflow_dispatch:
 
 jobs:
   build-ios:
-    runs-on: macos-15 # Serwery Apple Silicon od GitHuba
+    runs-on: macos-15 # Maszyna z Xcode 16+ i Apple Silicon
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Set up Xcode version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
 
       - name: Set up Python and SCons
         uses: actions/setup-python@v5
@@ -27,17 +31,15 @@ jobs:
 
       - name: Build Godot Editor for iOS
         run: |
-          scons platform=ios target=editor arch=arm64 production=yes scons_cache=.scons_cache
+          scons platform=ios target=editor arch=arm64 optimize=speed production=no debug_symbols=no scons_cache=.scons_cache
 
       - name: Package to Unsigned IPA
         run: |
-          # Tworzenie struktury paczki .app dla iOS
           mkdir -p Payload/Godot.app
           
-          # Kopiowanie skompilowanego pliku binarnego (nazwa zależy od wersji, zazwyczaj w bin/)
-          cp bin/godot.ios.editor.arm64 Payload/Godot.app/Godot
+          # Gwiazdka automatycznie dopasuje wersję stabilną lub deweloperską pliku binarnego
+          cp bin/godot.ios.editor.*arm64 Payload/Godot.app/Godot
           
-          # Generowanie podstawowego pliku Info.plist, żeby iOS wiedział, co to za aplikacja
           cat <<EOF > Payload/Godot.app/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -71,7 +73,6 @@ jobs:
           </plist>
           EOF
           
-          # Pakowanie do formatu .ipa
           zip -r ../../GodotEditor_iPad.ipa Payload
 
       - name: Upload Artifact
@@ -79,4 +80,4 @@ jobs:
         with:
           name: Godot-iPadOS-Editor
           path: GodotEditor_iPad.ipa
-          
+
