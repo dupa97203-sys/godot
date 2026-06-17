@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15 # Maszyna z Xcode 16+ i Apple Silicon
+    runs-on: macos-15
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -33,12 +33,17 @@ jobs:
         run: |
           scons platform=ios target=editor arch=arm64 optimize=speed production=no debug_symbols=no scons_cache=.scons_cache
 
+      - name: Check output files
+        run: |
+          echo "=== Zawartosc folderu bin ==="
+          ls -R bin || echo "Folder bin nie istnieje!"
+
       - name: Package to Unsigned IPA
         run: |
           mkdir -p Payload/Godot.app
           
-          # Gwiazdka automatycznie dopasuje wersję stabilną lub deweloperską pliku binarnego
-          cp bin/godot.ios.editor.*arm64 Payload/Godot.app/Godot
+          # Kopiujemy cokolwiek, co scons wypluł do folderu bin
+          cp bin/godot* Payload/Godot.app/Godot
           
           cat <<EOF > Payload/Godot.app/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -80,4 +85,5 @@ jobs:
         with:
           name: Godot-iPadOS-Editor
           path: GodotEditor_iPad.ipa
+
 
