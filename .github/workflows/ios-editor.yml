@@ -1,0 +1,82 @@
+name: 🛠️ Build Godot iPadOS Editor
+
+on:
+  workflow_dispatch: # Pozwala na ręczne uruchomienie przyciskiem
+
+jobs:
+  build-ios:
+    runs-on: macos-14 # Serwery Apple Silicon od GitHuba
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and SCons
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install SCons
+        run: |
+          python -m pip install scons
+
+      - name: Cache SCons builds
+        uses: actions/cache@v4
+        with:
+          path: .scons_cache
+          key: ${{ runner.os }}-godot-ios-editor
+
+      - name: Build Godot Editor for iOS
+        run: |
+          scons platform=ios target=editor arch=arm64 production=yes scons_cache=.scons_cache
+
+      - name: Package to Unsigned IPA
+        run: |
+          # Tworzenie struktury paczki .app dla iOS
+          mkdir -p Payload/Godot.app
+          
+          # Kopiowanie skompilowanego pliku binarnego (nazwa zależy od wersji, zazwyczaj w bin/)
+          cp bin/godot.ios.editor.arm64 Payload/Godot.app/Godot
+          
+          # Generowanie podstawowego pliku Info.plist, żeby iOS wiedział, co to za aplikacja
+          cat <<EOF > Payload/Godot.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>English</string>
+              <key>CFBundleExecutable</key>
+              <string>Godot</string>
+              <key>CFBundleIdentifier</key>
+              <string>org.godotengine.godot.editor</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>Godot Editor</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>4.x</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleVersion</key>
+              <string>1.0</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UIDeviceFamily</key>
+              <array>
+                  <integer>2</integer>
+              </array>
+          </dict>
+          </plist>
+          EOF
+          
+          # Pakowanie do formatu .ipa
+          zip -r ../../GodotEditor_iPad.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Godot-iPadOS-Editor
+          path: GodotEditor_iPad.ipa
+          
