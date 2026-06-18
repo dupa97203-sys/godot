@@ -33,51 +33,22 @@ jobs:
         run: |
           scons platform=ios target=editor arch=arm64 optimize=speed production=no debug_symbols=no scons_cache=.scons_cache
 
-      - name: Package to Unsigned IPA
+      - name: Link App Executable via Xcode
         run: |
-          mkdir -p Payload/Godot.app
+          # Przechodzimy do folderu platformy iOS, gdzie Godot ma gotowy projekt Xcode
+          cd platform/ios
           
-          # Kopiujemy nowo odkryta biblioteke statyczna jako glowny plik wykonywalny aplikacji
-          cp bin/libgodot.ios.editor.arm64.a Payload/Godot.app/Godot
+          # Uruchamiamy xcodebuild, ktory wezmie nasza biblioteke .a i zbuduje z niej prawdziwy program .app
+          xcodebuild -project godot_ios.xcodeproj -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SUBTITLE="" PRODUCT_NAME="GodotEditor"
           
-          cat <<EOF > Payload/Godot.app/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>English</string>
-              <key>CFBundleExecutable</key>
-              <string>Godot</string>
-              <key>CFBundleIdentifier</key>
-              <string>org.godotengine.godot.editor</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
-              <key>CFBundleName</key>
-              <string>Godot Editor</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>4.x</string>
-              <key>CFBundleSignature</key>
-              <string>????</string>
-              <key>CFBundleVersion</key>
-              <string>1.0</string>
-              <key>LSRequiresIPhoneOS</key>
-              <true/>
-              <key>UIDeviceFamily</key>
-              <array>
-                  <integer>2</integer>
-              </array>
-          </dict>
-          </plist>
-          EOF
-          
-          zip -r ../../GodotEditor_iPad.ipa Payload
+          # Przenosimy gotowa aplikacje i pakujemy do .ipa
+          mkdir -p ../../Payload
+          mv build/Debug-iphoneos/GodotEditor.app ../../Payload/
+          cd ../../
+          zip -r GodotEditor_iPad.ipa Payload
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Godot-iPadOS-Editor
           path: GodotEditor_iPad.ipa
-
