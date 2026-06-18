@@ -40,35 +40,54 @@ jobs:
           cache-name: ios-editor
         continue-on-error: true
 
-      - name: Link App Executable & Package IPA
+      - name: Link App Binary & Package IPA
         run: |
-          # Szukamy pliku xcodeproj w calym katalogu platform/ios i podfolderach
-          echo "=== Szukanie projektu Xcode ==="
-          REAL_PROJ_PATH=$(find platform/ios -name "*.xcodeproj" | head -n 1)
+          mkdir -p Payload/Godot.app
           
-          if [ -z "$REAL_PROJ_PATH" ]; then
-            echo "BŁĄD: Nie znaleziono żadnego projektu .xcodeproj w platform/ios!"
-            echo "Oto struktura katalogu platform/ios:"
-            ls -R platform/ios
-            exit 1
-          fi
+          echo "=== Łączenie bibliotek w plik wykonywalny iOS ==="
+          # Łączymy wygenerowane biblioteki w jeden plik binarny, który rozumie iOS
+          clang++ -arch arm64 -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -miphoneos-version-min=12.0 \
+            -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore -framework OpenGLES -framework Metal -framework AVFoundation -framework AudioToolbox -framework CoreAudio -framework CoreMotion -framework GameController \
+            -o Payload/Godot.app/Godot \
+            bin/libgodot.ios.editor.arm64.a \
+            platform/ios/libios.ios.editor.arm64.a
           
-          echo "Znaleziono projekt w sciezce: $REAL_PROJ_PATH"
+          echo "=== Tworzenie Info.plist ==="
+          cat <<EOF > Payload/Godot.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>English</string>
+              <key>CFBundleExecutable</key>
+              <string>Godot</string>
+              <key>CFBundleIdentifier</key>
+              <string>org.godotengine.godot.editor</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>Godot Editor</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>4.x</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleVersion</key>
+              <string>1.0</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UIDeviceFamily</key>
+              <array>
+                  <integer>2</integer>
+              </array>
+          </dict>
+          </plist>
+          EOF
           
-          # Uruchamiamy xcodebuild bezposrednio na znalezionym projekcie
-          xcodebuild -project "$REAL_PROJ_PATH" -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO PRODUCT_NAME="GodotEditor"
-          
-          # Pakowanie do .ipa (szukamy wygenerowanego .app w folderze platform/ios)
-          mkdir -p Payload
-          APP_PATH=$(find platform/ios -name "GodotEditor.app" -type d | head -n 1)
-          
-          if [ -z "$APP_PATH" ]; then
-             # Sprawdzamy alternatywna lokalizacje buildow Xcode
-             APP_PATH=$(find platform/ios/build -name "*.app" -type d | head -n 1)
-          fi
-          
-          echo "Kopiowanie aplikacji z: $APP_PATH"
-          cp -r "$APP_PATH" Payload/
+          echo "=== Pakowanie do IPA ==="
           zip -r GodotEditor_iPad.ipa Payload
 
       - name: Upload artifact
