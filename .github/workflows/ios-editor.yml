@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15 # Korzystamy z najnowszego stabilnego środowiska Apple
+    runs-on: macos-15
     timeout-minutes: 120
 
     steps:
@@ -18,19 +18,15 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
 
-      # Korzystamy z oficjalnej akcji przywracania cache z repozytorium Godota
       - name: Restore Godot build cache
         uses: ./.github/actions/godot-cache-restore
         with:
           cache-name: ios-editor
         continue-on-error: true
 
-      # Korzystamy z oficjalnej akcji instalacji zaleznosci (Python, SCons itp.)
       - name: Setup Python and SCons
         uses: ./.github/actions/godot-deps
 
-      # Kompilacja silnika jako Edytor na architekture arm64 (procesory iPada)
-      # Uzywamy oficjalnej akcji budujacej
       - name: Compilation (arm64)
         uses: ./.github/actions/godot-build
         with:
@@ -38,26 +34,29 @@ jobs:
           platform: ios
           target: editor
 
-      # Zapisujemy cache na przyszlosc, zeby kolejne buildy trwaly chwilke
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
         with:
           cache-name: ios-editor
         continue-on-error: true
 
-      # Pakowanie za pomoca projektu Xcode – dokladnie tak, jak wymaga tego iOS
-      # Ta metoda wypluje idealna strukture aplikacji
       - name: Link App Executable & Package IPA
         run: |
           cd platform/ios
-          xcodebuild -project godot_ios.xcodeproj -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO PRODUCT_NAME="GodotEditor"
           
+          # Automatycznie znajdujemy nazwe projektu Xcode, niewazne czy to godot.xcodeproj czy godot_ios.xcodeproj
+          XCODE_PROJ=$(ls -d *.xcodeproj | head -n 1)
+          echo "Znaleziono projekt: $XCODE_PROJ"
+          
+          # Uruchamiamy xcodebuild z dynamicznie dobrana nazwa projektu
+          xcodebuild -project "$XCODE_PROJ" -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO PRODUCT_NAME="GodotEditor"
+          
+          # Pakowanie do .ipa
           mkdir -p ../../Payload
           mv build/Debug-iphoneos/GodotEditor.app ../../Payload/
           cd ../../
           zip -r GodotEditor_iPad.ipa Payload
 
-      # Wysylamy gotowy plik .ipa do pobrania
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
