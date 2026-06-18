@@ -42,19 +42,33 @@ jobs:
 
       - name: Link App Executable & Package IPA
         run: |
-          cd platform/ios
+          # Szukamy pliku xcodeproj w calym katalogu platform/ios i podfolderach
+          echo "=== Szukanie projektu Xcode ==="
+          REAL_PROJ_PATH=$(find platform/ios -name "*.xcodeproj" | head -n 1)
           
-          # Automatycznie znajdujemy nazwe projektu Xcode, niewazne czy to godot.xcodeproj czy godot_ios.xcodeproj
-          XCODE_PROJ=$(ls -d *.xcodeproj | head -n 1)
-          echo "Znaleziono projekt: $XCODE_PROJ"
+          if [ -z "$REAL_PROJ_PATH" ]; then
+            echo "BŁĄD: Nie znaleziono żadnego projektu .xcodeproj w platform/ios!"
+            echo "Oto struktura katalogu platform/ios:"
+            ls -R platform/ios
+            exit 1
+          fi
           
-          # Uruchamiamy xcodebuild z dynamicznie dobrana nazwa projektu
-          xcodebuild -project "$XCODE_PROJ" -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO PRODUCT_NAME="GodotEditor"
+          echo "Znaleziono projekt w sciezce: $REAL_PROJ_PATH"
           
-          # Pakowanie do .ipa
-          mkdir -p ../../Payload
-          mv build/Debug-iphoneos/GodotEditor.app ../../Payload/
-          cd ../../
+          # Uruchamiamy xcodebuild bezposrednio na znalezionym projekcie
+          xcodebuild -project "$REAL_PROJ_PATH" -scheme godot_ios -configuration Debug -sdk iphoneos DEFAULT_CONFIGURATION=Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO PRODUCT_NAME="GodotEditor"
+          
+          # Pakowanie do .ipa (szukamy wygenerowanego .app w folderze platform/ios)
+          mkdir -p Payload
+          APP_PATH=$(find platform/ios -name "GodotEditor.app" -type d | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+             # Sprawdzamy alternatywna lokalizacje buildow Xcode
+             APP_PATH=$(find platform/ios/build -name "*.app" -type d | head -n 1)
+          fi
+          
+          echo "Kopiowanie aplikacji z: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
           zip -r GodotEditor_iPad.ipa Payload
 
       - name: Upload artifact
