@@ -1,4 +1,4 @@
-name: 🔍 Debug Godot Build Folder
+name: 🛠️ Build Godot iPadOS Editor
 
 on:
   workflow_dispatch:
@@ -31,24 +31,53 @@ jobs:
 
       - name: Build Godot Editor for iOS
         run: |
-          # Kontynuujemy kompilację (Scons użyje cache, więc dociągnie tylko to, czego brakuje)
           scons platform=ios target=editor arch=arm64 optimize=speed production=no debug_symbols=no scons_cache=.scons_cache
 
-      - name: Package BIN folder to ZIP
-        if: always() # To sprawi, że ZIP zrobi się NAWET JEŚLI kompilacja się wywali!
+      - name: Package to Unsigned IPA
         run: |
-          mkdir -p bin_debug
-          if [ -d "bin" ]; then
-            cp -r bin/* bin_debug/
-          else
-            echo "Folder bin NIE ISTNIEJE, tworze pusty plik tekstowy w zamian" > bin_debug/error.txt
-          fi
-          zip -r ../../Godot_Bin_Folder.zip bin_debug
+          mkdir -p Payload/Godot.app
+          
+          # Kopiujemy nowo odkryta biblioteke statyczna jako glowny plik wykonywalny aplikacji
+          cp bin/libgodot.ios.editor.arm64.a Payload/Godot.app/Godot
+          
+          cat <<EOF > Payload/Godot.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>English</string>
+              <key>CFBundleExecutable</key>
+              <string>Godot</string>
+              <key>CFBundleIdentifier</key>
+              <string>org.godotengine.godot.editor</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>Godot Editor</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>4.x</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleVersion</key>
+              <string>1.0</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UIDeviceFamily</key>
+              <array>
+                  <integer>2</integer>
+              </array>
+          </dict>
+          </plist>
+          EOF
+          
+          zip -r ../../GodotEditor_iPad.ipa Payload
 
-      - name: Upload Debug Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: Godot-Bin-Output
-          path: Godot_Bin_Folder.zip
+          name: Godot-iPadOS-Editor
+          path: GodotEditor_iPad.ipa
 
