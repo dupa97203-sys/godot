@@ -27,10 +27,12 @@ jobs:
       - name: Setup Python and SCons
         uses: ./.github/actions/godot-deps
 
+      # Budujemy za pomoca SCons, ale dodajemy flagi vulkan=yes oraz moltenvk=yes.
+      # To zmusza SCons do automatycznego podlinkowania brakujacych funkcji graficznych!
       - name: Compilation (arm64)
         uses: ./.github/actions/godot-build
         with:
-          scons-flags: dev_mode=no optimize=speed debug_symbols=no arch=arm64 production=no
+          scons-flags: dev_mode=no optimize=speed debug_symbols=no arch=arm64 production=no vulkan=yes moltenvk=yes
           platform: ios
           target: editor
 
@@ -40,32 +42,13 @@ jobs:
           cache-name: ios-editor
         continue-on-error: true
 
-      - name: Link App Binary & Package IPA
+      - name: Package to IPA
         run: |
           mkdir -p Payload/Godot.app
           
-          echo "=== Łączenie bibliotek w plik wykonywalny iOS ==="
-          # Dodalismy -lstdc++ oraz dodatkowe frameworki (CoreVideo, IOKit), ktore sa potrzebne do prawidlowego zlinkowania Vulkana/MoltenVK
-          clang++ -arch arm64 -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
-            -miphoneos-version-min=12.0 \
-            -lstdc++ \
-            -framework Foundation \
-            -framework UIKit \
-            -framework CoreGraphics \
-            -framework QuartzCore \
-            -framework OpenGLES \
-            -framework Metal \
-            -framework AVFoundation \
-            -framework AudioToolbox \
-            -framework CoreAudio \
-            -framework CoreMotion \
-            -framework GameController \
-            -framework CoreVideo \
-            -framework IOKit \
-            -framework CoreFoundation \
-            -o Payload/Godot.app/Godot \
-            bin/libgodot.ios.editor.arm64.a \
-            platform/ios/libios.ios.editor.arm64.a
+          # Poniewaz poprosilismy o pelny build, SCons powinien wrzucic gotowy plik binarny do bin/
+          # Kopiujemy go i zmieniamy nazwe na 'Godot'
+          cp bin/godot.ios.editor.*arm64 Payload/Godot.app/Godot || cp bin/godot* Payload/Godot.app/Godot
           
           echo "=== Tworzenie Info.plist ==="
           cat <<EOF > Payload/Godot.app/Info.plist
